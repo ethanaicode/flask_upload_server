@@ -52,5 +52,5 @@ def uploaded_file(filename):
 
 if __name__ == '__main__':
     # 在局域网可访问
-    print("🚀 文件上传服务启动中：请访问 http://<本机局域网IP>:33333")
-    app.run(host='0.0.0.0', port=33333, debug=True)
+    print("🚀 文件上传服务启动中：请访问 http://<本机局域网IP>:8900")
+    app.run(host='0.0.0.0', port=8900, debug=True)
