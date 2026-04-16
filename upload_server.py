@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory
 import os
-from werkzeug.utils import secure_filename
+import re
 
 app = Flask(__name__)
 
@@ -16,6 +16,22 @@ ALLOWED_EXTENSIONS = {'jpg', 'png', 'gif', 'mp4', 'zip', 'pdf', 'txt', 'docx', '
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def safe_filename(filename):
+    """
+    支持中文的安全文件名处理函数
+    保留中文、英文、数字、下划线、横线和点号，移除其他不安全字符
+    """
+    # 移除路径分隔符和其他危险字符
+    filename = filename.replace('\\', '').replace('/', '')
+    # 只保留安全字符：中文、字母、数字、下划线、横线、点号
+    filename = re.sub(r'[^\w\u4e00-\u9fa5.-]', '_', filename)
+    # 移除开头的点号（防止隐藏文件）
+    filename = filename.lstrip('.')
+    # 如果文件名为空，使用默认名称
+    if not filename:
+        filename = 'unnamed_file'
+    return filename
 
 @app.route('/')
 def index():
@@ -237,7 +253,7 @@ def index():
     <body>
         <main class="page">
             <section class="hero">
-                <h2>文件上传测试</h2>
+                <h2>文件上传服务</h2>
                 <p>上传时保持在当前页面，服务端返回的 JSON 会被解析后展示在下方结果列表中。</p>
 
                 <form id="upload-form" enctype="multipart/form-data">
@@ -392,7 +408,7 @@ def upload_file():
 
     if file and allowed_file(file.filename):
         original_filename = file.filename
-        filename = secure_filename(file.filename)
+        filename = safe_filename(file.filename)
         save_path = os.path.join(UPLOAD_FOLDER, filename)
         file.save(save_path)
         file_url = f"/uploads/{filename}"
