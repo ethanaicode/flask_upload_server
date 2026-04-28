@@ -11,8 +11,11 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # 允许上传的最大文件大小（这里是 2GB）
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024
 
+# 默认启用文件类型校验；如果需要允许所有文件类型上传，可以将下面的值设置为 True
+app.config['ALLOW_ALL_FILE_TYPES'] = False
+
 # 允许的文件扩展名，可自行修改
-ALLOWED_EXTENSIONS = {'jpg', 'png', 'gif', 'mp4', 'zip', 'pdf', 'txt', 'docx', 'xlsx', 'dump', 'dat'}
+ALLOWED_EXTENSIONS = {'jpg', 'png', 'gif', 'mp4', 'zip', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'dump', 'dat'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -406,7 +409,9 @@ def upload_file():
     if file.filename == '':
         return jsonify({'status': 0, 'message': '未选择文件'})
 
-    if file and allowed_file(file.filename):
+    allow_any_type = app.config.get('ALLOW_ALL_FILE_TYPES', False)
+
+    if file and (allow_any_type or allowed_file(file.filename)):
         original_filename = file.filename
         filename = safe_filename(file.filename)
         save_path = os.path.join(UPLOAD_FOLDER, filename)
