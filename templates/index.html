@@ -1,445 +1,1003 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文件上传服务</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>共享文件服务</title>
     <style>
-        :root {
-            color-scheme: light;
-            --bg: linear-gradient(135deg, #f4efe6 0%, #dbe7f3 100%);
-            --card: rgba(255, 252, 247, 0.92);
-            --border: rgba(45, 76, 99, 0.16);
-            --text: #1f2a33;
-            --muted: #5f6f7b;
-            --accent: #166534;
-            --accent-strong: #14532d;
-            --danger: #b42318;
-            --danger-soft: #fef3f2;
-            --success-soft: #ecfdf3;
-            --shadow: 0 18px 50px rgba(31, 42, 51, 0.12);
-        }
+      :root {
+        color-scheme: light;
+        --bg: linear-gradient(135deg, #f4efe6 0%, #dbe7f3 100%);
+        --card: rgba(255, 252, 247, 0.92);
+        --border: rgba(45, 76, 99, 0.16);
+        --text: #1f2a33;
+        --muted: #5f6f7b;
+        --accent: #166534;
+        --accent-strong: #14532d;
+        --danger: #b42318;
+        --danger-soft: #fef3f2;
+        --success-soft: #ecfdf3;
+        --shadow: 0 18px 50px rgba(31, 42, 51, 0.12);
+      }
 
-        * {
-            box-sizing: border-box;
-        }
+      * {
+        box-sizing: border-box;
+      }
 
-        body {
-            margin: 0;
-            font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
-            color: var(--text);
-            background: var(--bg);
-            min-height: 100vh;
-        }
+      body {
+        margin: 0;
+        font-family:
+          "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+        min-height: 100vh;
+      }
 
+      h3 {
+        margin: 0;
+      }
+
+      .page {
+        width: min(1200px, calc(100vw - 32px));
+        margin: 40px auto;
+        display: grid;
+        gap: 20px;
+      }
+
+      .hero,
+      .browser,
+      .results {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(10px);
+      }
+
+      .hero {
+        padding: 28px;
+      }
+
+      .hero h2,
+      .results h3 {
+        margin: 0;
+        font-weight: 700;
+      }
+
+      .hero p {
+        margin: 12px 0 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      form {
+        margin-top: 24px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .upload-box {
+        border: 1.5px dashed rgba(22, 101, 52, 0.28);
+        border-radius: 18px;
+        padding: 24px;
+        background: rgba(255, 255, 255, 0.65);
+        cursor: pointer;
+        transition:
+          border-color 0.18s ease,
+          transform 0.18s ease,
+          background 0.18s ease;
+      }
+
+      .upload-box.drag-over {
+        border-color: var(--accent);
+        background: rgba(236, 253, 243, 0.9);
+        transform: translateY(-1px);
+      }
+
+      .upload-main {
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .upload-sub {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      #file-input {
+        display: none;
+      }
+
+      .selected-files {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+        word-break: break-all;
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: none;
+        border-radius: 999px;
+        padding: 12px 22px;
+        font-size: 15px;
+        font-weight: 700;
+        color: #fff;
+        background: linear-gradient(
+          135deg,
+          var(--accent) 0%,
+          var(--accent-strong) 100%
+        );
+        cursor: pointer;
+        transition:
+          transform 0.18s ease,
+          opacity 0.18s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button:disabled {
+        opacity: 0.65;
+        cursor: wait;
+        transform: none;
+      }
+
+      .hint,
+      .status-text {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .status-text.error {
+        color: var(--danger);
+        font-weight: 700;
+      }
+
+      .results {
+        padding: 24px;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .browser {
+        padding: 24px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .toolbar-right {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .toolbar-input {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 10px 14px;
+        font-size: 14px;
+        min-width: 180px;
+        background: rgba(255, 255, 255, 0.92);
+        color: var(--text);
+      }
+
+      .toolbar-check {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .crumbs {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .crumb-btn {
+        border: none;
+        padding: 6px 10px;
+        border-radius: 10px;
+        background: rgba(22, 101, 52, 0.12);
+        color: var(--accent-strong);
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .danger-btn {
+        background: linear-gradient(135deg, #b42318 0%, #7a271a 100%);
+        color: #fff;
+      }
+
+      .action-cell {
+        width: 190px;
+        min-width: 190px;
+      }
+
+      .action-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .action-btn {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 76px;
+        height: 32px;
+        border-radius: 10px;
+        border: none;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          transform 0.18s ease,
+          opacity 0.18s ease;
+      }
+
+      .action-btn:hover {
+        transform: translateY(-1px);
+      }
+
+      .action-btn.enter {
+        background: rgba(22, 101, 52, 0.12);
+        color: var(--accent-strong);
+      }
+
+      .action-btn.download {
+        background: rgba(21, 94, 117, 0.14);
+        color: #155e75;
+      }
+
+      .action-btn.delete {
+        background: linear-gradient(135deg, #b42318 0%, #7a271a 100%);
+        color: #fff;
+      }
+
+      .crumb-sep {
+        color: var(--muted);
+        user-select: none;
+      }
+
+      .entry-name-btn {
+        border: none;
+        background: transparent;
+        color: var(--accent-strong);
+        font-weight: 700;
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .small {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .results-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .empty-state {
+        padding: 24px;
+        text-align: center;
+        color: var(--muted);
+        border: 1px dashed var(--border);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.55);
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid rgba(45, 76, 99, 0.1);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 680px;
+      }
+
+      th,
+      td {
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(45, 76, 99, 0.08);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        font-size: 13px;
+        letter-spacing: 0.02em;
+        color: var(--muted);
+        background: rgba(219, 231, 243, 0.42);
+      }
+
+      tr:last-child td {
+        border-bottom: none;
+        min-width: 100px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .badge.success {
+        color: var(--accent-strong);
+        background: var(--success-soft);
+      }
+
+      .badge.error {
+        color: var(--danger);
+        background: var(--danger-soft);
+      }
+
+      a {
+        color: var(--accent-strong);
+      }
+
+      @media (max-width: 720px) {
         .page {
-            width: min(960px, calc(100vw - 32px));
-            margin: 40px auto;
-            display: grid;
-            gap: 20px;
+          width: calc(100vw - 20px);
+          margin: 20px auto;
         }
 
         .hero,
+        .browser,
         .results {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            box-shadow: var(--shadow);
-            backdrop-filter: blur(10px);
-        }
-
-        .hero {
-            padding: 28px;
-        }
-
-        .hero h2,
-        .results h3 {
-            margin: 0;
-            font-weight: 700;
-        }
-
-        .hero p {
-            margin: 12px 0 0;
-            color: var(--muted);
-            line-height: 1.6;
-        }
-
-        form {
-            margin-top: 24px;
-            display: grid;
-            gap: 16px;
-        }
-
-        .upload-box {
-            border: 1.5px dashed rgba(22, 101, 52, 0.28);
-            border-radius: 18px;
-            padding: 24px;
-            background: rgba(255, 255, 255, 0.65);
-            cursor: pointer;
-            transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
-        }
-
-        .upload-box.drag-over {
-            border-color: var(--accent);
-            background: rgba(236, 253, 243, 0.9);
-            transform: translateY(-1px);
-        }
-
-        .upload-main {
-            font-size: 15px;
-            font-weight: 700;
-        }
-
-        .upload-sub {
-            margin-top: 6px;
-            color: var(--muted);
-            font-size: 13px;
-        }
-
-        #file-input {
-            display: none;
-        }
-
-        .selected-files {
-            margin-top: 12px;
-            color: var(--muted);
-            font-size: 13px;
-            line-height: 1.5;
-            word-break: break-all;
-        }
-
-        .actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        button {
-            border: none;
-            border-radius: 999px;
-            padding: 12px 22px;
-            font-size: 15px;
-            font-weight: 700;
-            color: #fff;
-            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
-            cursor: pointer;
-            transition: transform 0.18s ease, opacity 0.18s ease;
-        }
-
-        button:hover {
-            transform: translateY(-1px);
-        }
-
-        button:disabled {
-            opacity: 0.65;
-            cursor: wait;
-            transform: none;
-        }
-
-        .hint,
-        .status-text {
-            color: var(--muted);
-            font-size: 14px;
-        }
-
-        .results {
-            padding: 24px;
-        }
-
-        .results-head {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-
-        .empty-state {
-            padding: 24px;
-            text-align: center;
-            color: var(--muted);
-            border: 1px dashed var(--border);
-            border-radius: 18px;
-            background: rgba(255, 255, 255, 0.55);
-        }
-
-        .table-wrap {
-            overflow-x: auto;
-            border: 1px solid rgba(45, 76, 99, 0.1);
-            border-radius: 18px;
-            background: rgba(255, 255, 255, 0.72);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 680px;
+          border-radius: 20px;
+          padding: 20px;
         }
 
         th,
         td {
-            padding: 14px 16px;
-            border-bottom: 1px solid rgba(45, 76, 99, 0.08);
-            text-align: left;
-            vertical-align: top;
+          padding: 12px;
         }
-
-        th {
-            font-size: 13px;
-            letter-spacing: 0.02em;
-            color: var(--muted);
-            background: rgba(219, 231, 243, 0.42);
-        }
-
-        tr:last-child td {
-            border-bottom: none;
-        }
-
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            border-radius: 999px;
-            padding: 5px 10px;
-            font-size: 12px;
-            font-weight: 700;
-        }
-
-        .badge.success {
-            color: var(--accent-strong);
-            background: var(--success-soft);
-        }
-
-        .badge.error {
-            color: var(--danger);
-            background: var(--danger-soft);
-        }
-
-        a {
-            color: var(--accent-strong);
-        }
-
-        @media (max-width: 720px) {
-            .page {
-                width: calc(100vw - 20px);
-                margin: 20px auto;
-            }
-
-            .hero,
-            .results {
-                border-radius: 20px;
-                padding: 20px;
-            }
-
-            th,
-            td {
-                padding: 12px;
-            }
-        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <main class="page">
-        <section class="hero">
-            <h2>文件上传服务</h2>
-            <p>支持多文件选择、拖拽上传，同名文件会在服务器端自动追加序号。</p>
+      <section class="hero">
+        <h2>共享文件服务</h2>
+        <p>
+          支持多文件选择、拖拽上传，同名文件会在服务器端自动追加序号，并上传到当前浏览目录。
+        </p>
 
-            <form id="upload-form" enctype="multipart/form-data">
-                <div id="drop-zone" class="upload-box">
-                    <div class="upload-main">点击选择文件，或将文件拖拽到这里</div>
-                    <div class="upload-sub">可一次选择多个文件上传</div>
-                    <input id="file-input" type="file" name="files" multiple>
-                    <div id="selected-files" class="selected-files">当前未选择文件</div>
-                </div>
-                <div class="actions">
-                    <button id="submit-button" type="submit">上传</button>
-                    <span id="status-text" class="status-text">等待选择文件</span>
-                </div>
-                <div class="hint">支持多次上传，新的结果会持续追加到页面中。</div>
-            </form>
-        </section>
+        <form id="upload-form" enctype="multipart/form-data">
+          <div id="drop-zone" class="upload-box">
+            <div class="upload-main">点击选择文件，或将文件拖拽到这里</div>
+            <div class="upload-sub">可一次选择多个文件上传</div>
+            <input id="file-input" type="file" name="files" multiple />
+            <div id="selected-files" class="selected-files">当前未选择文件</div>
+          </div>
+          <div class="actions">
+            <button id="submit-button" type="submit">上传</button>
+            <span id="status-text" class="status-text">等待选择文件</span>
+          </div>
+        </form>
+      </section>
 
-        <section class="results">
-            <div class="results-head">
-                <h3>上传结果</h3>
-                <span class="hint">展示本次页面会话中的上传记录</span>
-            </div>
+      <section id="upload-results" class="results hidden">
+        <div class="results-head">
+          <h3>上传结果</h3>
+          <span class="hint">展示本次页面会话中的上传记录</span>
+        </div>
 
-            <div id="empty-state" class="empty-state">暂无上传记录，上传后会在这里追加结果。</div>
+        <div id="empty-state" class="empty-state">
+          暂无上传记录，上传后会在这里追加结果。
+        </div>
 
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>时间</th>
-                            <th>上传文件</th>
-                            <th>保存文件名</th>
-                            <th>结果</th>
-                            <th>说明</th>
-                            <th>访问地址</th>
-                        </tr>
-                    </thead>
-                    <tbody id="result-body"></tbody>
-                </table>
-            </div>
-        </section>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>上传文件</th>
+                <th>保存文件名</th>
+                <th>结果</th>
+                <th>说明</th>
+                <th>访问地址</th>
+              </tr>
+            </thead>
+            <tbody id="result-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="browser">
+        <div class="results-head">
+          <h3>共享目录</h3>
+          <span id="folder-summary" class="hint">读取中...</span>
+        </div>
+
+        <div class="toolbar">
+          <div id="breadcrumbs" class="crumbs"></div>
+          <div class="toolbar-right">
+            <label class="toolbar-check" for="show-ignored">
+              <input id="show-ignored" type="checkbox" />
+              显示被忽略项
+            </label>
+            <input
+              id="folder-name-input"
+              class="toolbar-input"
+              type="text"
+              placeholder="新建文件夹名称"
+            />
+            <button id="create-folder-button" type="button">新建文件夹</button>
+            <button id="refresh-button" type="button">刷新目录</button>
+          </div>
+        </div>
+
+        <div id="folder-empty" class="empty-state">当前目录为空。</div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>类型</th>
+                <th>大小</th>
+                <th>修改时间</th>
+                <th class="action-cell">操作</th>
+              </tr>
+            </thead>
+            <tbody id="folder-body"></tbody>
+          </table>
+        </div>
+      </section>
     </main>
 
     <script>
-        const form = document.getElementById('upload-form');
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        const selectedFilesText = document.getElementById('selected-files');
-        const submitButton = document.getElementById('submit-button');
-        const statusText = document.getElementById('status-text');
-        const resultBody = document.getElementById('result-body');
-        const emptyState = document.getElementById('empty-state');
+      const form = document.getElementById("upload-form");
+      const dropZone = document.getElementById("drop-zone");
+      const fileInput = document.getElementById("file-input");
+      const selectedFilesText = document.getElementById("selected-files");
+      const submitButton = document.getElementById("submit-button");
+      const statusText = document.getElementById("status-text");
+      const uploadResultsSection = document.getElementById("upload-results");
+      const resultBody = document.getElementById("result-body");
+      const emptyState = document.getElementById("empty-state");
+      const folderBody = document.getElementById("folder-body");
+      const folderEmpty = document.getElementById("folder-empty");
+      const folderSummary = document.getElementById("folder-summary");
+      const breadcrumbs = document.getElementById("breadcrumbs");
+      const refreshButton = document.getElementById("refresh-button");
+      const createFolderButton = document.getElementById(
+        "create-folder-button",
+      );
+      const folderNameInput = document.getElementById("folder-name-input");
+      const showIgnoredCheckbox = document.getElementById("show-ignored");
 
-        function escapeHtml(value) {
-            return String(value).replace(/[&<>"']/g, function(char) {
-                const entityMap = {
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    '"': '&quot;',
-                    "'": '&#39;'
-                };
-                return entityMap[char] || char;
-            });
+      let currentPath = "";
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (char) {
+          const entityMap = {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+          };
+          return entityMap[char] || char;
+        });
+      }
+
+      function updateSelectedFilesText(files) {
+        if (!files || files.length === 0) {
+          selectedFilesText.textContent = "当前未选择文件";
+          return;
         }
 
-        function updateSelectedFilesText(files) {
-            if (!files || files.length === 0) {
-                selectedFilesText.textContent = '当前未选择文件';
-                return;
-            }
+        const names = Array.from(files).map(function (file) {
+          return file.name;
+        });
+        selectedFilesText.textContent =
+          "已选择 " + names.length + " 个文件: " + names.join(" | ");
+      }
 
-            const names = Array.from(files).map(function(file) {
-                return file.name;
-            });
-            selectedFilesText.textContent = '已选择 ' + names.length + ' 个文件: ' + names.join(' | ');
+      function setStatusText(message, isError) {
+        statusText.textContent = message;
+        statusText.classList.toggle("error", Boolean(isError));
+      }
+
+      function formatFileSize(bytes) {
+        if (
+          bytes === null ||
+          bytes === undefined ||
+          Number.isNaN(Number(bytes))
+        ) {
+          return "-";
+        }
+        const value = Number(bytes);
+        if (value < 1024) {
+          return value + " B";
+        }
+        if (value < 1024 * 1024) {
+          return (value / 1024).toFixed(1) + " KB";
+        }
+        if (value < 1024 * 1024 * 1024) {
+          return (value / (1024 * 1024)).toFixed(1) + " MB";
+        }
+        return (value / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+      }
+
+      function splitSegments(path) {
+        if (!path) {
+          return [];
+        }
+        return path.split("/").filter(function (item) {
+          return item;
+        });
+      }
+
+      function setUrlPath(path) {
+        const url = new URL(window.location.href);
+        if (path) {
+          url.searchParams.set("path", path);
+        } else {
+          url.searchParams.delete("path");
+        }
+        window.history.replaceState({}, "", url.toString());
+      }
+
+      function renderBreadcrumbs(path) {
+        const segments = splitSegments(path);
+        breadcrumbs.innerHTML = "";
+
+        const rootButton = document.createElement("button");
+        rootButton.type = "button";
+        rootButton.className = "crumb-btn";
+        rootButton.textContent = "uploads";
+        rootButton.addEventListener("click", function () {
+          loadDirectory("");
+        });
+        breadcrumbs.appendChild(rootButton);
+
+        let built = "";
+        segments.forEach(function (segment) {
+          const sep = document.createElement("span");
+          sep.className = "crumb-sep";
+          sep.textContent = "/";
+          breadcrumbs.appendChild(sep);
+
+          built = built ? built + "/" + segment : segment;
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "crumb-btn";
+          button.textContent = segment;
+          const targetPath = built;
+          button.addEventListener("click", function () {
+            loadDirectory(targetPath);
+          });
+          breadcrumbs.appendChild(button);
+        });
+      }
+
+      function renderFolderRows(entries) {
+        folderBody.innerHTML = "";
+
+        if (!entries || entries.length === 0) {
+          folderEmpty.style.display = "block";
+          return;
         }
 
-        function appendResultRow(record) {
-            emptyState.style.display = 'none';
+        folderEmpty.style.display = "none";
 
-            const ok = record.status === 1;
-            const statusClass = ok ? 'success' : 'error';
-            const statusLabel = ok ? '成功' : '失败';
-            const fileLink = ok && record.url
-                ? '<a href="' + escapeHtml(record.url) + '" target="_blank" rel="noreferrer">查看文件</a>'
-                : '-';
+        entries.forEach(function (item) {
+          const row = document.createElement("tr");
 
-            const row = document.createElement('tr');
-            row.innerHTML =
-                '<td>' + escapeHtml(new Date().toLocaleString('zh-CN')) + '</td>' +
-                '<td>' + escapeHtml(record.original_filename || '-') + '</td>' +
-                '<td>' + escapeHtml(record.filename || '-') + '</td>' +
-                '<td><span class="badge ' + statusClass + '">' + statusLabel + '</span></td>' +
-                '<td>' + escapeHtml(record.message || '-') + '</td>' +
-                '<td>' + fileLink + '</td>';
+          const nameCell = document.createElement("td");
+          if (item.is_dir) {
+            const enterBtn = document.createElement("button");
+            enterBtn.type = "button";
+            enterBtn.className = "entry-name-btn";
+            enterBtn.textContent = "📁 " + (item.name || "-");
+            enterBtn.addEventListener("click", function () {
+              loadDirectory(item.relative_path || "");
+            });
+            nameCell.appendChild(enterBtn);
+          } else {
+            nameCell.textContent = "📄 " + (item.name || "-");
+          }
 
-            resultBody.prepend(row);
+          const typeCell = document.createElement("td");
+          typeCell.textContent = item.is_dir ? "目录" : "文件";
+
+          const sizeCell = document.createElement("td");
+          sizeCell.textContent = item.is_dir ? "-" : formatFileSize(item.size);
+
+          const modifiedCell = document.createElement("td");
+          modifiedCell.textContent = item.modified_at || "-";
+
+          const actionCell = document.createElement("td");
+          actionCell.className = "action-cell";
+          const actionGroup = document.createElement("div");
+          actionGroup.className = "action-group";
+
+          if (item.is_dir) {
+            const openBtn = document.createElement("button");
+            openBtn.type = "button";
+            openBtn.className = "action-btn enter";
+            openBtn.textContent = "进入";
+            openBtn.addEventListener("click", function () {
+              loadDirectory(item.relative_path || "");
+            });
+            actionGroup.appendChild(openBtn);
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.type = "button";
+            deleteBtn.className = "action-btn delete";
+            deleteBtn.textContent = "删除";
+            deleteBtn.addEventListener("click", function () {
+              deleteEntry(item);
+            });
+            actionGroup.appendChild(deleteBtn);
+          } else if (item.download_url) {
+            const link = document.createElement("a");
+            link.className = "action-btn download";
+            link.href = item.download_url;
+            link.target = "_blank";
+            link.rel = "noreferrer";
+            link.textContent = "下载";
+            actionGroup.appendChild(link);
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.type = "button";
+            deleteBtn.className = "action-btn delete";
+            deleteBtn.textContent = "删除";
+            deleteBtn.addEventListener("click", function () {
+              deleteEntry(item);
+            });
+            actionGroup.appendChild(deleteBtn);
+          } else {
+            actionCell.textContent = "-";
+          }
+
+          if (actionGroup.childElementCount > 0) {
+            actionCell.textContent = "";
+            actionCell.appendChild(actionGroup);
+          }
+
+          row.appendChild(nameCell);
+          row.appendChild(typeCell);
+          row.appendChild(sizeCell);
+          row.appendChild(modifiedCell);
+          row.appendChild(actionCell);
+          folderBody.appendChild(row);
+        });
+      }
+
+      async function loadDirectory(path) {
+        folderSummary.textContent = "正在读取目录...";
+        refreshButton.disabled = true;
+        createFolderButton.disabled = true;
+
+        try {
+          const targetPath = path || "";
+          const showIgnored = showIgnoredCheckbox.checked ? "1" : "0";
+          const response = await fetch(
+            "/api/list?path=" +
+              encodeURIComponent(targetPath) +
+              "&show_ignored=" +
+              showIgnored,
+          );
+          const payload = await response.json();
+
+          if (!response.ok || payload.status !== 1) {
+            throw new Error(payload.message || "读取目录失败");
+          }
+
+          currentPath = payload.current_path || "";
+          setUrlPath(currentPath);
+          renderBreadcrumbs(currentPath);
+          renderFolderRows(
+            Array.isArray(payload.entries) ? payload.entries : [],
+          );
+
+          const count = Array.isArray(payload.entries)
+            ? payload.entries.length
+            : 0;
+          folderSummary.textContent =
+            "当前目录: /" + (currentPath || "") + "，共 " + count + " 项";
+          setStatusText("当前上传目录: /" + (currentPath || ""), false);
+        } catch (error) {
+          folderBody.innerHTML = "";
+          folderEmpty.style.display = "block";
+          folderEmpty.textContent =
+            "读取目录失败: " + (error.message || "未知错误");
+          folderSummary.textContent = "目录读取失败";
+          setStatusText("目录读取失败", true);
+        } finally {
+          refreshButton.disabled = false;
+          createFolderButton.disabled = false;
+        }
+      }
+
+      async function createFolder() {
+        const folderName = (folderNameInput.value || "").trim();
+        if (!folderName) {
+          setStatusText("请先输入文件夹名称", true);
+          return;
         }
 
-        dropZone.addEventListener('click', function() {
-            fileInput.click();
+        createFolderButton.disabled = true;
+        setStatusText("正在创建目录...", false);
+
+        try {
+          const response = await fetch("/api/mkdir", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              current_path: currentPath,
+              folder_name: folderName,
+            }),
+          });
+          const payload = await response.json();
+
+          if (!response.ok || payload.status !== 1) {
+            throw new Error(payload.message || "创建目录失败");
+          }
+
+          folderNameInput.value = "";
+          setStatusText(payload.message || "目录创建成功", false);
+          await loadDirectory(currentPath);
+        } catch (error) {
+          setStatusText("创建目录失败: " + (error.message || "未知错误"), true);
+        } finally {
+          createFolderButton.disabled = false;
+        }
+      }
+
+      async function deleteEntry(entry) {
+        const name = entry && entry.name ? entry.name : "该项目";
+        const label = entry && entry.is_dir ? "目录" : "文件";
+
+        const firstConfirm = window.confirm(
+          "确定删除" + label + ' "' + name + '" 吗？',
+        );
+        if (!firstConfirm) {
+          return;
+        }
+
+        // 如果是目录才会二次确认，因为目录删除可能会比较危险
+        if (label === "目录") {
+          const secondConfirm =
+            window.confirm("再次确认：删除后不可恢复，是否继续？");
+          if (!secondConfirm) {
+            return;
+          }
+        }
+
+        setStatusText("正在删除...", false);
+
+        try {
+          const response = await fetch("/api/delete", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              target_path: entry.relative_path,
+            }),
+          });
+          const payload = await response.json();
+
+          if (!response.ok || payload.status !== 1) {
+            throw new Error(payload.message || "删除失败");
+          }
+
+          setStatusText(payload.message || "删除成功", false);
+          await loadDirectory(currentPath);
+        } catch (error) {
+          setStatusText("删除失败: " + (error.message || "未知错误"), true);
+        }
+      }
+
+      function appendResultRow(record) {
+        uploadResultsSection.classList.remove("hidden");
+        emptyState.style.display = "none";
+
+        const ok = record.status === 1;
+        const statusClass = ok ? "success" : "error";
+        const statusLabel = ok ? "成功" : "失败";
+        const fileLink =
+          ok && record.url
+            ? '<a href="' +
+              escapeHtml(record.url) +
+              '" target="_blank" rel="noreferrer">查看文件</a>'
+            : "-";
+
+        const row = document.createElement("tr");
+        row.innerHTML =
+          "<td>" +
+          escapeHtml(new Date().toLocaleString("zh-CN")) +
+          "</td>" +
+          "<td>" +
+          escapeHtml(record.original_filename || "-") +
+          "</td>" +
+          "<td>" +
+          escapeHtml(record.filename || "-") +
+          "</td>" +
+          '<td><span class="badge ' +
+          statusClass +
+          '">' +
+          statusLabel +
+          "</span></td>" +
+          "<td>" +
+          escapeHtml(record.message || "-") +
+          "</td>" +
+          "<td>" +
+          fileLink +
+          "</td>";
+
+        resultBody.prepend(row);
+      }
+
+      dropZone.addEventListener("click", function () {
+        fileInput.click();
+      });
+
+      fileInput.addEventListener("change", function () {
+        updateSelectedFilesText(fileInput.files);
+      });
+
+      ["dragenter", "dragover"].forEach(function (eventName) {
+        dropZone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          dropZone.classList.add("drag-over");
+        });
+      });
+
+      ["dragleave", "drop"].forEach(function (eventName) {
+        dropZone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          dropZone.classList.remove("drag-over");
+        });
+      });
+
+      dropZone.addEventListener("drop", function (event) {
+        const droppedFiles = event.dataTransfer.files;
+        if (!droppedFiles || droppedFiles.length === 0) {
+          return;
+        }
+
+        const transfer = new DataTransfer();
+        Array.from(droppedFiles).forEach(function (file) {
+          transfer.items.add(file);
+        });
+        fileInput.files = transfer.files;
+        updateSelectedFilesText(fileInput.files);
+      });
+
+      refreshButton.addEventListener("click", function () {
+        loadDirectory(currentPath);
+      });
+
+      createFolderButton.addEventListener("click", function () {
+        createFolder();
+      });
+
+      folderNameInput.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          createFolder();
+        }
+      });
+
+      showIgnoredCheckbox.addEventListener("change", function () {
+        loadDirectory(currentPath);
+      });
+
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        const selectedFiles = fileInput.files;
+        if (!selectedFiles || selectedFiles.length === 0) {
+          setStatusText("请先选择至少一个文件", true);
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("current_path", currentPath);
+        Array.from(selectedFiles).forEach(function (file) {
+          formData.append("files", file);
         });
 
-        fileInput.addEventListener('change', function() {
-            updateSelectedFilesText(fileInput.files);
-        });
+        submitButton.disabled = true;
+        setStatusText("正在上传 " + selectedFiles.length + " 个文件...", false);
 
-        ['dragenter', 'dragover'].forEach(function(eventName) {
-            dropZone.addEventListener(eventName, function(event) {
-                event.preventDefault();
-                event.stopPropagation();
-                dropZone.classList.add('drag-over');
+        try {
+          const response = await fetch("/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          const payload = await response.json();
+          const results = Array.isArray(payload.results) ? payload.results : [];
+
+          if (results.length === 0) {
+            appendResultRow({
+              status: 0,
+              original_filename: "-",
+              filename: "-",
+              message: payload.message || "服务器未返回文件结果",
+              url: "",
             });
-        });
-
-        ['dragleave', 'drop'].forEach(function(eventName) {
-            dropZone.addEventListener(eventName, function(event) {
-                event.preventDefault();
-                event.stopPropagation();
-                dropZone.classList.remove('drag-over');
+          } else {
+            results.forEach(function (item) {
+              appendResultRow(item);
             });
-        });
+          }
 
-        dropZone.addEventListener('drop', function(event) {
-            const droppedFiles = event.dataTransfer.files;
-            if (!droppedFiles || droppedFiles.length === 0) {
-                return;
-            }
+          if (response.ok && payload.status === 1) {
+            setStatusText(payload.message || "上传完成", false);
+            form.reset();
+            updateSelectedFilesText([]);
+            await loadDirectory(currentPath);
+          } else {
+            setStatusText(payload.message || "上传失败", true);
+          }
+        } catch (error) {
+          appendResultRow({
+            status: 0,
+            original_filename: "-",
+            filename: "-",
+            message: "请求失败，请检查服务状态或返回内容是否为 JSON",
+            url: "",
+          });
+          setStatusText("请求失败", true);
+        } finally {
+          submitButton.disabled = false;
+        }
+      });
 
-            const transfer = new DataTransfer();
-            Array.from(droppedFiles).forEach(function(file) {
-                transfer.items.add(file);
-            });
-            fileInput.files = transfer.files;
-            updateSelectedFilesText(fileInput.files);
-        });
-
-        form.addEventListener('submit', async function(event) {
-            event.preventDefault();
-
-            const selectedFiles = fileInput.files;
-            if (!selectedFiles || selectedFiles.length === 0) {
-                statusText.textContent = '请先选择至少一个文件';
-                return;
-            }
-
-            const formData = new FormData();
-            Array.from(selectedFiles).forEach(function(file) {
-                formData.append('files', file);
-            });
-
-            submitButton.disabled = true;
-            statusText.textContent = '正在上传 ' + selectedFiles.length + ' 个文件...';
-
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const payload = await response.json();
-                const results = Array.isArray(payload.results) ? payload.results : [];
-
-                if (results.length === 0) {
-                    appendResultRow({
-                        status: 0,
-                        original_filename: '-',
-                        filename: '-',
-                        message: payload.message || '服务器未返回文件结果',
-                        url: ''
-                    });
-                } else {
-                    results.forEach(function(item) {
-                        appendResultRow(item);
-                    });
-                }
-
-                if (response.ok && payload.status === 1) {
-                    statusText.textContent = payload.message || '上传完成';
-                    form.reset();
-                    updateSelectedFilesText([]);
-                } else {
-                    statusText.textContent = payload.message || '上传失败';
-                }
-            } catch (error) {
-                appendResultRow({
-                    status: 0,
-                    original_filename: '-',
-                    filename: '-',
-                    message: '请求失败，请检查服务状态或返回内容是否为 JSON',
-                    url: ''
-                });
-                statusText.textContent = '请求失败';
-            } finally {
-                submitButton.disabled = false;
-            }
-        });
+      const initialPath =
+        new URLSearchParams(window.location.search).get("path") || "";
+      loadDirectory(initialPath);
     </script>
-</body>
+  </body>
 </html>
