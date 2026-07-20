@@ -277,6 +277,64 @@ button:disabled {
   padding: 0;
 }
 
+.thumb-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(45, 76, 99, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+  cursor: zoom-in;
+}
+
+.thumb-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.lightbox-image {
+  max-width: min(1100px, 92vw);
+  max-height: 88vh;
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+  background: #fff;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  min-width: 76px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .small {
   font-size: 12px;
   color: var(--muted);

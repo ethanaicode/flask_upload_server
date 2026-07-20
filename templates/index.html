@@ -86,6 +86,7 @@
             <thead>
               <tr>
                 <th>名称</th>
+                <th>预览</th>
                 <th>类型</th>
                 <th>大小</th>
                 <th>修改时间</th>
@@ -97,6 +98,13 @@
         </div>
       </section>
     </main>
+
+    <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true">
+      <button id="lightbox-close" class="lightbox-close" type="button" aria-label="关闭预览">
+        关闭
+      </button>
+      <img id="lightbox-image" class="lightbox-image" alt="图片预览" />
+    </div>
 
     <script>
       const form = document.getElementById("upload-form");
@@ -118,8 +126,42 @@
       );
       const folderNameInput = document.getElementById("folder-name-input");
       const showIgnoredCheckbox = document.getElementById("show-ignored");
+      const lightbox = document.getElementById("lightbox");
+      const lightboxImage = document.getElementById("lightbox-image");
+      const lightboxClose = document.getElementById("lightbox-close");
 
       let currentPath = "";
+
+      function isImageFilename(filename) {
+        return /\.(png|jpe?g|gif|webp|bmp|svg|ico|avif)$/i.test(
+          filename || "",
+        );
+      }
+
+      function isImageEntry(item) {
+        return (
+          item &&
+          !item.is_dir &&
+          Boolean(item.download_url) &&
+          isImageFilename(item.name)
+        );
+      }
+
+      function openLightbox(url, alt) {
+        if (!url) {
+          return;
+        }
+        lightboxImage.src = url;
+        lightboxImage.alt = alt || "图片预览";
+        lightbox.classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeLightbox() {
+        lightbox.classList.add("hidden");
+        lightboxImage.src = "";
+        document.body.style.overflow = "";
+      }
 
       function escapeHtml(value) {
         return String(value).replace(/[&<>"']/g, function (char) {
@@ -252,6 +294,27 @@
             nameCell.textContent = "📄 " + (item.name || "-");
           }
 
+          const previewCell = document.createElement("td");
+          if (isImageEntry(item)) {
+            const thumbButton = document.createElement("button");
+            thumbButton.type = "button";
+            thumbButton.className = "thumb-button";
+
+            const thumbImage = document.createElement("img");
+            thumbImage.className = "thumb-image";
+            thumbImage.src = item.download_url;
+            thumbImage.alt = item.name || "图片";
+            thumbImage.loading = "lazy";
+            thumbButton.appendChild(thumbImage);
+
+            thumbButton.addEventListener("click", function () {
+              openLightbox(item.download_url, item.name || "图片预览");
+            });
+            previewCell.appendChild(thumbButton);
+          } else {
+            previewCell.textContent = "-";
+          }
+
           const typeCell = document.createElement("td");
           typeCell.textContent = item.is_dir ? "目录" : "文件";
 
@@ -311,6 +374,7 @@
           }
 
           row.appendChild(nameCell);
+          row.appendChild(previewCell);
           row.appendChild(typeCell);
           row.appendChild(sizeCell);
           row.appendChild(modifiedCell);
@@ -542,6 +606,22 @@
 
       showIgnoredCheckbox.addEventListener("change", function () {
         loadDirectory(currentPath);
+      });
+
+      lightboxClose.addEventListener("click", function () {
+        closeLightbox();
+      });
+
+      lightbox.addEventListener("click", function (event) {
+        if (event.target === lightbox) {
+          closeLightbox();
+        }
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !lightbox.classList.contains("hidden")) {
+          closeLightbox();
+        }
       });
 
       form.addEventListener("submit", async function (event) {
