@@ -1,0 +1,16 @@
+[Unit]
+Description=Flask Upload Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/data/www/flask_upload_server
+ExecStart=/data/www/flask_upload_server/.venv/bin/python /data/www/flask_upload_server/upload_server.py
+Restart=always
+RestartSec=3
+User=www-data
+Group=www-data
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
