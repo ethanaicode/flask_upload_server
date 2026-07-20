@@ -1,18 +1,86 @@
-from flask import Flask, request, jsonify, send_from_directory, render_template
+from functools import wraps
+import hmac
+from flask import Flask, request, jsonify, send_from_directory, render_template, session
 import os
 import re
 import shutil
 from datetime import datetime
 from urllib.parse import quote
 
+from dotenv import find_dotenv, load_dotenv
+
 app = Flask(__name__)
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+cwd_dotenv = find_dotenv(usecwd=True)
+if cwd_dotenv:
+    load_dotenv(cwd_dotenv, override=True)
+load_dotenv(os.path.join(BASE_DIR, '.env'), override=True)
+
+
+def get_env_value(*names, default=''):
+    for name in names:
+        value = os.getenv(name)
+        if value is not None:
+            return value
+    return default
+
+
+def get_bool_env(*names, default=False):
+    value = get_env_value(*names, default='')
+    if value == '':
+        return default
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def get_int_env(*names, default):
+    value = get_env_value(*names, default='')
+    if value == '':
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def resolve_path_from_env(raw_path, base_dir=BASE_DIR):
+    raw_path = (raw_path or '').strip()
+    if not raw_path:
+        return ''
+
+    expanded_path = os.path.expanduser(raw_path)
+    if os.path.isabs(expanded_path):
+        return os.path.abspath(expanded_path)
+
+    return os.path.abspath(os.path.join(base_dir, expanded_path))
+
 # 设置上传目录
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'Public', 'uploads')
+UPLOAD_FOLDER = resolve_path_from_env(
+    get_env_value('UPLOAD_FOLDER', 'UPLOAD_DIR', 'UPLOAD_PATH', default='')
+) or os.path.join(BASE_DIR, 'Public', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # 允许上传的最大文件大小（这里是 2GB）
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024
+
+app.config['SECRET_KEY'] = get_env_value(
+    'SECRET_KEY',
+    'FLASK_SECRET_KEY',
+    default='flask-upload-server-secret-key'
+)
+
+app.config['ACCESS_PASSWORD'] = get_env_value(
+    'ACCESS_PASSWORD',
+    'UPLOAD_PASSWORD',
+    'PAGE_PASSWORD',
+    default=''
+)
+
+app.config['STARTUP_MODE'] = get_env_value('STARTUP_MODE', 'RUN_MODE', default='lan').strip().lower()
+app.config['STARTUP_HOST'] = get_env_value('HOST', 'BIND_HOST', default='').strip()
+app.config['STARTUP_PORT'] = get_int_env('PORT', 'RUN_PORT', default=8900)
+app.config['STARTUP_DEBUG'] = get_bool_env('DEBUG', 'FLASK_DEBUG', default=False)
 
 # 默认启用文件类型校验；如果需要允许所有文件类型上传，可以将下面的值设置为 True
 app.config['ALLOW_ALL_FILE_TYPES'] = True
@@ -22,6 +90,26 @@ app.config['IGNORED_LISTING_NAMES'] = {'.DS_Store'}
 
 # 允许的文件扩展名，可自行修改
 ALLOWED_EXTENSIONS = {'jpg', 'png', 'gif', 'mp4', 'zip', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'dump', 'dat'}
+
+
+def password_is_required():
+    return bool((app.config.get('ACCESS_PASSWORD') or '').strip())
+
+
+def is_authenticated():
+    if not password_is_required():
+        return True
+    return session.get('upload_server_authenticated') is True
+
+
+def require_authentication(view_func):
+    @wraps(view_func)
+    def wrapped_view(*args, **kwargs):
+        if not is_authenticated():
+            return jsonify({'status': 0, 'message': '需要先验证密码'}), 401
+        return view_func(*args, **kwargs)
+
+    return wrapped_view
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -100,9 +188,41 @@ def get_request_value(key, default=''):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template(
+        'index.html',
+        password_required=password_is_required(),
+        authenticated=is_authenticated(),
+    )
+
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    if not password_is_required():
+        session['upload_server_authenticated'] = True
+        return jsonify({'status': 1, 'message': '当前未启用密码', 'authenticated': True})
+
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = request.form
+
+    submitted_password = payload.get('password', '')
+    access_password = app.config.get('ACCESS_PASSWORD', '')
+
+    if hmac.compare_digest(str(submitted_password), str(access_password)):
+        session['upload_server_authenticated'] = True
+        return jsonify({'status': 1, 'message': '验证成功', 'authenticated': True})
+
+    session.pop('upload_server_authenticated', None)
+    return jsonify({'status': 0, 'message': '密码错误', 'authenticated': False}), 401
+
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    session.pop('upload_server_authenticated', None)
+    return jsonify({'status': 1, 'message': '已退出登录', 'authenticated': False})
 
 @app.route('/upload', methods=['POST'])
+@require_authentication
 def upload_file():
     try:
         current_path, target_dir = build_absolute_path(request.form.get('current_path', ''))
@@ -178,6 +298,7 @@ def upload_file():
 
 
 @app.route('/api/list', methods=['GET'])
+@require_authentication
 def list_files():
     try:
         current_path, current_dir = build_absolute_path(request.args.get('path', ''))
@@ -226,6 +347,7 @@ def list_files():
 
 
 @app.route('/api/mkdir', methods=['POST'])
+@require_authentication
 def create_folder():
     folder_name = safe_filename(get_request_value('folder_name', '').strip())
     if not folder_name:
@@ -251,6 +373,7 @@ def create_folder():
 
 
 @app.route('/api/delete', methods=['POST'])
+@require_authentication
 def delete_entry():
     try:
         target_relative_path, target_path = build_absolute_path(get_request_value('target_path', ''))
@@ -278,10 +401,21 @@ def delete_entry():
 
 # 提供静态访问（访问上传后的文件）
 @app.route('/uploads/<path:filename>')
+@require_authentication
 def uploaded_file(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 if __name__ == '__main__':
-    # 在局域网可访问
-    print("File upload server started: http://<LAN-IP>:8900")
-    app.run(host='0.0.0.0', port=8900, debug=False)
+    startup_mode = app.config.get('STARTUP_MODE', 'lan')
+    startup_host = app.config.get('STARTUP_HOST') or (
+        '127.0.0.1' if startup_mode == 'local' else '0.0.0.0'
+    )
+    startup_port = app.config.get('STARTUP_PORT', 8900)
+    startup_debug = app.config.get('STARTUP_DEBUG', False)
+
+    if startup_host == '0.0.0.0':
+        print(f'File upload server started: http://<LAN-IP>:{startup_port}')
+    else:
+        print(f'File upload server started: http://127.0.0.1:{startup_port}')
+
+    app.run(host=startup_host, port=startup_port, debug=startup_debug)

@@ -7,7 +7,36 @@
     <link rel="stylesheet" href="/static/upload-theme.css" />
   </head>
   <body>
-    <main class="page">
+    <section
+      id="auth-gate"
+      class="auth-gate {% if not password_required or authenticated %}hidden{% endif %}"
+    >
+      <div class="auth-card">
+        <p class="auth-kicker">访问受限</p>
+        <h1>请输入密码后继续</h1>
+        <p class="auth-description">
+          当前服务已设置访问密码，验证通过后才能进入。
+        </p>
+
+        <form id="auth-form" class="auth-form">
+          <input
+            id="auth-password"
+            class="auth-input"
+            type="password"
+            autocomplete="current-password"
+            placeholder="请输入访问密码"
+          />
+          <button id="auth-submit" type="submit">进入</button>
+        </form>
+
+        <div id="auth-status" class="auth-status">请输入密码继续访问</div>
+      </div>
+    </section>
+
+    <main
+      id="app-shell"
+      class="page {% if password_required and not authenticated %}hidden{% endif %}"
+    >
       <section class="hero">
         <h2>共享文件服务</h2>
         <p>
@@ -107,6 +136,15 @@
     </div>
 
     <script>
+      const passwordRequired = {{ password_required | tojson }};
+      const authenticatedInitially = {{ authenticated | tojson }};
+
+      const authGate = document.getElementById("auth-gate");
+      const authForm = document.getElementById("auth-form");
+      const authPassword = document.getElementById("auth-password");
+      const authSubmit = document.getElementById("auth-submit");
+      const authStatus = document.getElementById("auth-status");
+      const appShell = document.getElementById("app-shell");
       const form = document.getElementById("upload-form");
       const dropZone = document.getElementById("drop-zone");
       const fileInput = document.getElementById("file-input");
@@ -131,6 +169,7 @@
       const lightboxClose = document.getElementById("lightbox-close");
 
       let currentPath = "";
+      let appInitialized = false;
 
       function isImageFilename(filename) {
         return /\.(png|jpe?g|gif|webp|bmp|svg|ico|avif)$/i.test(
@@ -192,6 +231,56 @@
       function setStatusText(message, isError) {
         statusText.textContent = message;
         statusText.classList.toggle("error", Boolean(isError));
+      }
+
+      function showApp() {
+        if (authGate) {
+          authGate.classList.add("hidden");
+        }
+        if (appShell) {
+          appShell.classList.remove("hidden");
+        }
+      }
+
+      function showAuthGate(message, isError) {
+        if (authGate) {
+          authGate.classList.remove("hidden");
+        }
+        if (appShell) {
+          appShell.classList.add("hidden");
+        }
+        if (authStatus && message) {
+          authStatus.textContent = message;
+          authStatus.classList.toggle("error", Boolean(isError));
+        }
+      }
+
+      async function bootstrapApp() {
+        if (appInitialized) {
+          return;
+        }
+
+        appInitialized = true;
+        const initialPath =
+          new URLSearchParams(window.location.search).get("path") || "";
+        await loadDirectory(initialPath);
+      }
+
+      async function submitPassword(password) {
+        const response = await fetch("/api/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ password: password }),
+        });
+
+        const payload = await response.json();
+        if (!response.ok || payload.status !== 1) {
+          throw new Error(payload.message || "密码错误");
+        }
+
+        return payload;
       }
 
       function formatFileSize(bytes) {
@@ -624,6 +713,33 @@
         }
       });
 
+      authForm.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        if (!passwordRequired) {
+          showApp();
+          await bootstrapApp();
+          return;
+        }
+
+        const password = authPassword.value || "";
+        authSubmit.disabled = true;
+        showAuthGate("正在验证密码...", false);
+
+        try {
+          const payload = await submitPassword(password);
+          showAuthGate(payload.message || "验证成功", false);
+          authPassword.value = "";
+          showApp();
+          await bootstrapApp();
+        } catch (error) {
+          showAuthGate("验证失败: " + (error.message || "密码错误"), true);
+        } finally {
+          authSubmit.disabled = false;
+          authPassword.focus();
+        }
+      });
+
       form.addEventListener("submit", async function (event) {
         event.preventDefault();
 
@@ -687,9 +803,13 @@
         }
       });
 
-      const initialPath =
-        new URLSearchParams(window.location.search).get("path") || "";
-      loadDirectory(initialPath);
+      if (passwordRequired && !authenticatedInitially) {
+        showAuthGate("请输入密码继续访问", false);
+        authPassword.focus();
+      } else {
+        showApp();
+        bootstrapApp();
+      }
     </script>
   </body>
 </html>
