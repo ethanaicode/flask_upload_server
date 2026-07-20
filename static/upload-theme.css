@@ -375,7 +375,7 @@ td {
   padding: 14px 16px;
   border-bottom: 1px solid rgba(45, 76, 99, 0.08);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 th {
