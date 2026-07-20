@@ -4,6 +4,7 @@ This folder provides a minimal systemd setup for this project.
 
 Files
 - flask_upload_server.service: systemd unit file template.
+- flask_upload_server.nginx.conf: nginx reverse proxy template.
 
 Before use
 1. Update WorkingDirectory in flask_upload_server.service.
@@ -38,3 +39,18 @@ Update workflow after code changes
 Nginx reverse proxy recommendation
 - Keep Python service bound to 127.0.0.1.
 - Let nginx expose 80/443 and proxy to 127.0.0.1:8900.
+
+Nginx install steps on Linux server
+1. Copy nginx config:
+   sudo cp flask_upload_server.nginx.conf /etc/nginx/conf.d/flask_upload_server.conf
+2. Test nginx config:
+   sudo nginx -t
+3. Reload nginx:
+   sudo systemctl reload nginx
+
+If only the homepage works but API/upload fails
+1. Ensure proxy target is 127.0.0.1:8900.
+2. Ensure client_max_body_size is set (this project needs up to 2048m).
+3. Ensure proxy_read_timeout and proxy_send_timeout are long enough.
+4. Check nginx logs:
+   sudo tail -f /var/log/nginx/error.log
